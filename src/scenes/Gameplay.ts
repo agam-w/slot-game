@@ -64,8 +64,8 @@ export default class Gameplay extends Phaser.Scene {
   running = false;
   reels: Reel[] = [];
 
-  balanceText: Phaser.GameObjects.Text;
-  betText: Phaser.GameObjects.Text;
+  balanceText: Phaser.GameObjects.Text | undefined;
+  betText: Phaser.GameObjects.Text | undefined;
 
   preload() {
     this.load.image("eggHead", "eggHead.png");
@@ -206,7 +206,7 @@ export default class Gameplay extends Phaser.Scene {
     if (this.running) return;
     this.running = true;
     this.balance -= this.bet;
-    this.balanceText.text = "Balance: $" + this.balance.toLocaleString();
+    this.balanceText!.text = "Balance: $" + this.balance.toLocaleString();
 
     for (let i = 0; i < this.reels.length; i++) {
       const r = this.reels[i];
@@ -266,7 +266,7 @@ export default class Gameplay extends Phaser.Scene {
           const amount = prize.multiplier * this.bet;
           console.log("you got $", amount);
           this.balance += amount;
-          this.balanceText.text = "Balance: $" + this.balance.toLocaleString();
+          this.balanceText!.text = "Balance: $" + this.balance.toLocaleString();
         }
       });
 

@@ -2,7 +2,54 @@ import Phaser from "phaser";
 
 const REEL_WIDTH = 160;
 const SYMBOL_SIZE = 160;
-const slotTextures = ["eggHead", "flowerTop", "helmlok", "skully"];
+
+// we map symbols to texture
+enum Symbols {
+  One = "eggHead",
+  Two = "flowerTop",
+  Three = "helmlok",
+  Four = "skully",
+}
+
+const slotTextures = [Symbols.One, Symbols.Two, Symbols.Three, Symbols.Four];
+
+type SymbolPrize = {
+  multiplier: number;
+  min: number;
+  max: number;
+};
+
+// multiplier is the reward, percentage of bet
+// min is the min number of symbols appeared in spin
+// max is the max number of symbols appeard in spin
+const prizeConfig: Record<Symbols, SymbolPrize[]> = {
+  [Symbols.One]: [
+    { multiplier: 0.2, min: 4, max: 7 },
+    { multiplier: 0.75, min: 8, max: 12 },
+    { multiplier: 2.0, min: 13, max: 15 },
+  ],
+  [Symbols.Two]: [
+    { multiplier: 0.3, min: 4, max: 7 },
+    { multiplier: 0.8, min: 8, max: 12 },
+    { multiplier: 2.5, min: 13, max: 15 },
+  ],
+  [Symbols.Three]: [
+    { multiplier: 0.5, min: 4, max: 7 },
+    { multiplier: 0.9, min: 8, max: 12 },
+    { multiplier: 3.0, min: 13, max: 15 },
+  ],
+  [Symbols.Four]: [
+    { multiplier: 0.6, min: 4, max: 7 },
+    { multiplier: 1.0, min: 8, max: 12 },
+    { multiplier: 3.5, min: 13, max: 15 },
+  ],
+};
+
+// get price of symbol
+const getSymbolPrize = (symbol: Symbols, qty: number) => {
+  const symbolPrize = prizeConfig[symbol];
+  return symbolPrize.find((i) => i.min <= qty && i.max >= qty);
+};
 
 type Reel = {
   container: Phaser.GameObjects.Container;
@@ -12,14 +59,19 @@ type Reel = {
 };
 
 export default class Gameplay extends Phaser.Scene {
+  balance = 1000;
+  bet = 1;
   running = false;
   reels: Reel[] = [];
 
+  balanceText: Phaser.GameObjects.Text;
+  betText: Phaser.GameObjects.Text;
+
   preload() {
-    this.load.image("eggHead", "public/eggHead.png");
-    this.load.image("flowerTop", "public/flowerTop.png");
-    this.load.image("helmlok", "public/helmlok.png");
-    this.load.image("skully", "public/skully.png");
+    this.load.image("eggHead", "eggHead.png");
+    this.load.image("flowerTop", "flowerTop.png");
+    this.load.image("helmlok", "helmlok.png");
+    this.load.image("skully", "skully.png");
   }
 
   create() {
@@ -95,6 +147,28 @@ export default class Gameplay extends Phaser.Scene {
       },
     );
     spinText.setOrigin(0.5, 0.5);
+
+    this.balanceText = this.add.text(
+      20,
+      bot.y + 20,
+      "Balance: $" + this.balance.toLocaleString(),
+      {
+        fontFamily: "Arial",
+        fontSize: 18,
+        color: "#fff",
+      },
+    );
+
+    this.betText = this.add.text(
+      bot.width / 2 - 200,
+      bot.y + 20,
+      "BET: $" + this.bet.toFixed(1),
+      {
+        fontFamily: "Arial",
+        fontSize: 18,
+        color: "#fff",
+      },
+    );
   }
 
   update() {
@@ -131,6 +205,8 @@ export default class Gameplay extends Phaser.Scene {
   startPlay() {
     if (this.running) return;
     this.running = true;
+    this.balance -= this.bet;
+    this.balanceText.text = "Balance: $" + this.balance.toLocaleString();
 
     for (let i = 0; i < this.reels.length; i++) {
       const r = this.reels[i];
@@ -148,11 +224,53 @@ export default class Gameplay extends Phaser.Scene {
         },
         onComplete: () => {
           if (i === this.reels.length - 1) {
-            console.log("spin complete");
-            this.running = false;
+            this.onSpinComplete();
           }
         },
       });
     }
+  }
+
+  onSpinComplete() {
+    console.log("spin complete");
+    // wait animation to make sure its complete
+    // add delay 1s
+    setTimeout(() => {
+      // store output texture key here
+      const output: string[] = [];
+
+      for (let i = 0; i < this.reels.length; i++) {
+        const symbols = [...this.reels[i].symbols]
+          .filter((i) => i.y >= -10 && i.y <= 2 * SYMBOL_SIZE)
+          .sort((a, b) => a.y - b.y);
+        symbols.forEach((s) => {
+          // console.log(i, s.texture.key, s.y);
+          output.push(s.texture.key);
+        });
+      }
+
+      const result = output.reduce(
+        (acc, cur) => {
+          acc[cur] = (acc[cur] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
+
+      console.log(result);
+
+      Object.keys(result).forEach((k) => {
+        const prize = getSymbolPrize(k as Symbols, result[k]);
+        if (prize) {
+          console.log(k, prize);
+          const amount = prize.multiplier * this.bet;
+          console.log("you got $", amount);
+          this.balance += amount;
+          this.balanceText.text = "Balance: $" + this.balance.toLocaleString();
+        }
+      });
+
+      this.running = false;
+    }, 500);
   }
 }
